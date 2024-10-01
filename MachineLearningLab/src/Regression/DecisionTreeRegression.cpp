@@ -16,8 +16,6 @@ using namespace System::Windows::Forms; // For MessageBox
 
 
 ///  DecisionTreeRegression class implementation  ///
-
-
 // Constructor for DecisionTreeRegression class.//
 DecisionTreeRegression::DecisionTreeRegression(int min_samples_split, int max_depth, int n_feats)
 	: min_samples_split(min_samples_split), max_depth(max_depth), n_feats(n_feats), root(nullptr)
@@ -36,9 +34,15 @@ void DecisionTreeRegression::fit(std::vector<std::vector<double>>& X, std::vecto
 std::vector<double> DecisionTreeRegression::predict(std::vector<std::vector<double>>& X) {
 
 	std::vector<double> predictions;
-	
+
 	// Implement the function
 	// TODO
+	for (std::vector<double>& data_point : X) {
+		//Traverse through tree with each given vector
+		//TraverseTree returns label for given vector
+		predictions.push_back(traverseTree(data_point, root));
+	}
+
 	return predictions;
 }
 
@@ -46,21 +50,74 @@ std::vector<double> DecisionTreeRegression::predict(std::vector<std::vector<doub
 // growTree function: Grows a decision tree regression model using the given data and parameters //
 Node* DecisionTreeRegression::growTree(std::vector<std::vector<double>>& X, std::vector<double>& y, int depth) {
 
-
 	int split_idx = -1;
 	double split_thresh = 0.0;
-
+	double best_mse = DBL_MAX;
 	/* Implement the following:
 		--- define stopping criteria
-    	--- Loop through candidate features and potential split thresholds.
+		--- Loop through candidate features and potential split thresholds.
 		--- Find the best split threshold for the current feature.
 		--- grow the children that result from the split
 	*/
-	
-	// TODO
+	bool same_label_check = true;
+	//compare if the first label if it is same in the entire subset
+	for (int i = 1; i < y.size(); i++) {
+		//try to find the moment label is not the same and make same_label_check false ensure the stopping criteria is not true and break from loop
+		if (y[i] != y[0]) {
+			same_label_check = false;
+			break;
+		}
+	}
+	if (depth >= max_depth || X.size() <= min_samples_split || same_label_check || X.size() != y.size() || X.size() == 0 || y.size() == 0) {
+		//create a leaf node and assign it most common label
+		double predicted_mean = DecisionTreeRegression::mean(y);
+		Node* node = new Node(NULL, NULL, NULL, NULL, predicted_mean);
+		return node;
+	}
+	for (int feature = 0; feature < n_feats; feature++) {
+		std::vector<double> X_column;
+		for (int i = 0; i < X.size(); i++) {
+			X_column.push_back(X[i][feature]);
+		}
+		for (auto threshold : X_column) {
 
-	Node* left;
-	Node* right;
+			double mse = DecisionTreeRegression::meanSquaredError(y, X_column, threshold);
+
+			//update the values
+			if (mse < best_mse) {
+				best_mse = mse;
+				split_idx = feature;
+				split_thresh = threshold;
+			}
+		}
+	}
+	//if no split then create leaf node.
+	if (split_idx == -1) {
+		double predicted_mean = DecisionTreeRegression::mean(y);
+		Node* node = new Node(NULL, NULL, NULL, NULL, predicted_mean);
+		return node;
+	}
+	//split data based on the best feature and threshold (split datasets)
+	std::vector<double> y_right, y_left;
+	std::vector<std::vector<double>> left_subset, right_subset;
+	for (int i = 0; i < y.size(); i++) {
+		if (split_thresh >= X[i][split_idx]) {
+			y_left.push_back(y[i]);
+			left_subset.push_back(X[i]);
+		}
+		else {
+			y_right.push_back(y[i]);
+			right_subset.push_back(X[i]);
+		}
+	}
+
+	// TODO
+	Node* left; // grow the left tree
+	Node* right;  // grow the right tree
+	//grow the tree recursively
+
+	left = growTree(left_subset, y_left, depth + 1);
+	right = growTree(right_subset, y_right, depth + 1);
 	return new Node(split_idx, split_thresh, left, right); // return a new node with the split index, split threshold, left tree, and right tree
 }
 
@@ -69,10 +126,49 @@ Node* DecisionTreeRegression::growTree(std::vector<std::vector<double>>& X, std:
 double DecisionTreeRegression::meanSquaredError(std::vector<double>& y, std::vector<double>& X_column, double split_thresh) {
 
 	double mse = 0.0;
-	
 	// Calculate the mse
 	// TODO
-	
+	std::vector<double> y_left, y_right;
+	//Loop throguh all data points
+	//if value in x_column is less then split thresh then y value then added into y_left else y_right
+	for (int i = 0; i < y.size(); i++) {
+		if (X_column[i] <= split_thresh) {
+			y_left.push_back(y[i]);
+		}
+		else {
+			y_right.push_back(y[i]);
+		}
+	}
+
+	//calculate the mean of the y_left and y_right
+	double mean_left = DecisionTreeRegression::mean(y_left);
+	double mean_right = DecisionTreeRegression::mean(y_right);
+	double mse_left = 0.0;
+
+	//loop thourough y_left values and calculate mse
+	for (double value : y_left) {
+		double diff = value - mean_left;
+		mse_left = mse_left + diff * diff;
+	}
+	//look if the y_left is not empty then finish its calculiatons of mse
+	if (!y_left.empty()) {
+		mse_left = mse_left / y_left.size();
+	}
+
+	double mse_right = 0.0;
+	//loop through y_right values and calculate the mse.
+	for (double value : y_right) {
+		double diff = value - mean_right;
+		mse_right = mse_right + diff * diff;
+	}
+
+	//look if the y_right is not empty then then finish the calculation of mse for the right subset
+	if (!y_right.empty()) {
+		mse_right = mse_right / y_right.size();
+	}
+	//here we calculate the overall mse which is like the weighted average of mses of the two groups based on their sizes
+	mse = (y_left.size() * mse_left + y_right.size() * mse_right) / (y_left.size() + y_right.size());
+
 	return mse;
 }
 
@@ -80,10 +176,15 @@ double DecisionTreeRegression::meanSquaredError(std::vector<double>& y, std::vec
 double DecisionTreeRegression::mean(std::vector<double>& values) {
 
 	double meanValue = 0.0;
-	
+	double sum = 0.0;
+
+	for (auto value : values) {
+		sum = sum + value;
+	}
+
+	meanValue = (sum / (values.size() * 1.0));
 	// calculate the mean
 	// TODO
-	
 	return meanValue;
 }
 
@@ -96,8 +197,22 @@ double DecisionTreeRegression::traverseTree(std::vector<double>& x, Node* node) 
 		--- Otherwise, traverse the right subtree
 	*/
 	// TODO
+	//check if node is leaf node if so return value for this node.
+	if (node->isLeafNode()) {
+		return node->value;
+	}
 
-	return 0.0;
+	int feature = node->feature;
+	int threshold = node->threshold;
+	//check if feature value of input vector is less or equal to the nodes threshold then traverse the left tree else traverse the right
+	if (x[feature] <= threshold) {
+		return traverseTree(x, node->left);
+	}
+	else {
+		return traverseTree(x, node->right);
+	}
+
+	//return 0.0;
 }
 
 

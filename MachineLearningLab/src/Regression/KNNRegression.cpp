@@ -15,9 +15,10 @@
 #include <random>
 #include <unordered_map> 
 using namespace System::Windows::Forms; // For MessageBox
+using namespace std;
 
 
-                                                ///  KNNRegression class implementation  ///
+///  KNNRegression class implementation  ///
 
 
 /// KNNRegression function: Constructor for KNNRegression class, initializing the number of neighbors to use for prediction./// 
@@ -26,34 +27,58 @@ KNNRegression::KNNRegression(int k) : k_(k) {}
 
 /// fit function: Fits the KNNRegression model with the given training data. ///
 void KNNRegression::fit(const std::vector<std::vector<double>>& X_train, const std::vector<double>& y_train) {
-	X_train_ = X_train;
-	y_train_ = y_train;
+    X_train_ = X_train;
+    y_train_ = y_train;
 }
 
 
 
 /// predict function: Calculates the predicted values for a given set of test data points using KNN Regression. ///
 std::vector<double> KNNRegression::predict(const std::vector<std::vector<double>>& X_test) const {
-	std::vector<double> y_pred; // Store predicted values for all test data points
-	y_pred.reserve(X_test.size()); // Reserve memory for y_pred to avoid frequent reallocation
+    std::vector<double> y_pred; // Store predicted values for all test data points
+    y_pred.reserve(X_test.size()); // Reserve memory for y_pred to avoid frequent reallocation
 
-	// Check if training data is empty
-	if (X_train_.empty() || y_train_.empty()) {
-		throw std::runtime_error("Error: Empty training data.");
-	}
+    // Check if training data is empty
+    if (X_train_.empty() || y_train_.empty()) {
+        throw std::runtime_error("Error: Empty training data.");
+    }
 
-	/* Implement the following:
-		--- Loop through each test data point
-		--- Calculate Euclidean distance between test data point and each training data point
-		--- Loop through the labels and their counts to find the most frequent label
-		--- Store sum of y_train values for k-nearest neighbors
-		--- Calculate average of y_train values for k-nearest neighbors
-	*/
-	
-	//TODO
+    /* Implement the following:
+        --- Loop through each test data point
+        --- Calculate Euclidean distance between test data point and each training data point
+        --- Loop through the labels and their counts to find the most frequent label
+        --- Store sum of y_train values for k-nearest neighbors
+        --- Calculate average of y_train values for k-nearest neighbors
+    */
 
+    //TODO
+    for (const auto& testPoint : X_test)
+    {
+        vector<pair<double, double>> distances;
 
-	return y_pred; // Return vector of predicted values for all test data points
+        for (int i = 0; i < X_train_.size(); i++)
+        {
+            //double dist = SimilarityFunctions::euclideanDistance(testPoint, X_train_[i]);
+            double dist = SimilarityFunctions::manhattanDistance(testPoint, X_train_[i]);
+            distances.push_back(make_pair(dist, y_train_[i]));
+        }
+
+        sort(distances.begin(), distances.end(), [](const auto& a, const auto& b)
+            {
+                return a.first < b.first;
+            });
+
+        double sum = 0.0;
+        for (int i = 0; i < k_; i++)
+        {
+            sum += distances[i].second;
+        }
+
+        double avg = sum / k_;
+        y_pred.push_back(avg);
+    }
+
+    return y_pred; // Return vector of predicted values for all test data points
 }
 
 
